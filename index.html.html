@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPU Scheduling Simulator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        background: '#06060b',
+        foreground: '#e8e8ed',
+        card: '#0e0e16',
+        muted: '#161622',
+        'muted-foreground': '#6b6b80',
+        accent: '#1a1a2a',
+        primary: '#00d4ff',
+        destructive: '#ff4466',
+        border: 'rgba(255,255,255,0.06)',
+        input: 'rgba(255,255,255,0.08)',
+      }
+    }
+  }
+}
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #06060b;
+    color: #e8e8ed;
+    overflow-x: hidden;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0, 212, 255, 0.2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0, 212, 255, 0.4); }
+
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* Grid background */
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Glass card */
+  .glass {
+    background: rgba(14, 14, 22, 0.8);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(0, 212, 255, 0.08);
+  }
+
+  /* Gradient border */
+  .glow-border { position: relative; }
+  .glow-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(0,212,255,0.3), rgba(168,85,247,0.3), rgba(0,255,136,0.1));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Neon pulse glow */
+  @keyframes neonPulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(0,212,255,0.3), 0 0 60px rgba(0,212,255,0.1); }
+    50% { box-shadow: 0 0 30px rgba(0,212,255,0.5), 0 0 80px rgba(0,212,255,0.2); }
+  }
+  .neon-pulse { animation: neonPulse 2s ease-in-out infinite; }
+
+  /* Float */
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .float { animation: float 3s ease-in-out infinite; }
+
+  /* Fade in up */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+
+  /* Fade in */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+
+  /* Slide in right */
+  @keyframes slideInRight {
+    from { opacity: 0; transform: translateX(40px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .slide-in { animation: slideInRight 0.5s ease-out forwards; }
+
+  /* Scale in */
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .scale-in { animation: scaleIn 0.4s ease-out forwards; }
+
+  /* Spin slow */
+  @keyframes spinSlow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .spin-slow { animation: spinSlow 3s linear infinite; }
+
+  /* Thinking dots */
+  @keyframes thinkDot {
+    0%, 20% { opacity: 0.2; }
+    40% { opacity: 1; }
+    100% { opacity: 0.2; }
+  }
+  .think-dot:nth-child(1) { animation: thinkDot 1.4s ease-in-out infinite; }
+  .think-dot:nth-child(2) { animation: thinkDot 1.4s ease-in-out 0.2s infinite; }
+  .think-dot:nth-child(3) { animation: thinkDot 1.4s ease-in-out 0.4s infinite; }
+
+  /* Neon text */
+  .neon-text { text-shadow: 0 0 10px rgba(0,212,255,0.5), 0 0 30px rgba(0,212,255,0.2); }
+
+  /* Gantt block appear */
+  @keyframes ganttAppear {
+    from { opacity: 0; transform: scaleX(0); }
+    to { opacity: 1; transform: scaleX(1); }
+  }
+  .gantt-block { animation: ganttAppear 0.4s ease-out forwards; transform-origin: left; }
+
+  /* Shimmer on gantt blocks */
+  @keyframes blockShimmer {
+    0% { opacity: 0; }
+    50% { opacity: 0.5; }
+    100% { opacity: 0; }
+  }
+  .block-shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    animation: blockShimmer 1.5s ease-in-out infinite;
+  }
+
+  /* Confidence bar fill */
+  @keyframes fillBar {
+    from { width: 0; }
+  }
+  .fill-bar { animation: fillBar 1s ease-out forwards; }
+
+  /* Metric counter */
+  @keyframes countUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .count-up { animation: countUp 0.5s ease-out forwards; }
+
+  .hidden { display: none !important; }
+
+  /* Custom input styling */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #00d4ff, #00d4ff);
+    transition: all 0.3s;
+  }
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #00d4ff, #a855f7);
+    transform: scale(1.02);
+  }
+  .btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-secondary {
+    background: linear-gradient(135deg, #00d4ff, #a855f7);
+    transition: all 0.3s;
+  }
+  .btn-secondary:hover {
+    background: linear-gradient(135deg, #00c4ef, #9747e6);
+    transform: scale(1.02);
+  }
+  .btn-secondary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+</style>
+</head>
+<body class="bg-grid min-h-screen">
+
+  <!-- Background blurs -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden">
+    <div class="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[120px]"></div>
+    <div class="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[100px]"></div>
+  </div>
+
+  <div class="relative z-10 min-h-screen">
+
+    <!-- ============ SCREEN 1: LANDING ============ -->
+    <div id="screen-landing" class="min-h-screen flex flex-col items-center justify-center px-4">
+      <!-- Floating CPU icon -->
+      <div class="float mb-8">
+        <div class="w-24 h-24 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/20 flex items-center justify-center neon-pulse">
+          <svg class="w-12 h-12 text-cyan-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z"/></svg>
+        </div>
+      </div>
+
+      <!-- Title -->
+      <h1 class="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-4 text-center fade-in-up">
+        <span class="bg-gradient-to-r from-cyan-400 via-cyan-300 to-purple-400 bg-clip-text text-transparent neon-text">CPU Scheduling</span>
+        <br>
+        <span class="text-white/90">Simulator</span>
+      </h1>
+
+      <!-- Subtitle -->
+      <p class="text-[#6b6b80] text-lg mb-12 text-center max-w-md fade-in-up" style="animation-delay:0.2s">
+        AI-powered scheduling analysis with intelligent algorithm selection and real-time visualization
+      </p>
+
+      <!-- Start Button -->
+      <button onclick="showScreen('input')" class="group relative px-10 py-4 rounded-xl font-semibold text-lg overflow-hidden transition-all duration-300 hover:scale-105 active:scale-95 neon-pulse cursor-pointer fade-in-up" style="animation-delay:0.4s">
+        <div class="absolute inset-0 bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-xl"></div>
+        <div class="absolute inset-0 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <span class="relative flex items-center gap-3 text-gray-900">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+          Start Processing
+          <svg class="w-5 h-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+        </span>
+      </button>
+
+      <!-- Feature badges -->
+      <div class="flex flex-wrap justify-center gap-4 mt-16 fade-in-up" style="animation-delay:0.6s">
+        <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.03] border border-white/[0.06] text-[#6b6b80] text-sm">
+          <svg class="w-4 h-4 text-cyan-400/70" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+          ML-Powered
+        </div>
+        <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.03] border border-white/[0.06] text-[#6b6b80] text-sm">
+          <svg class="w-4 h-4 text-cyan-400/70" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+          5 Algorithms
+        </div>
+        <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.03] border border-white/[0.06] text-[#6b6b80] text-sm">
+          <svg class="w-4 h-4 text-cyan-400/70" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5"/></svg>
+          Live Gantt Chart
+        </div>
+        <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.03] border border-white/[0.06] text-[#6b6b80] text-sm">
+          <svg class="w-4 h-4 text-cyan-400/70" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>
+          Metrics Analysis
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SCREEN 2: INPUT ============ -->
+    <div id="screen-input" class="hidden min-h-screen flex flex-col items-center px-4 py-12">
+      <div class="w-full max-w-3xl">
+        <!-- Back -->
+        <button onclick="showScreen('landing')" class="flex items-center gap-2 text-[#6b6b80] hover:text-white transition-colors mb-8 cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+          Back
+        </button>
+
+        <!-- Header -->
+        <div class="text-center mb-10 fade-in-up">
+          <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm mb-4">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25z"/></svg>
+            Process Configuration
+          </div>
+          <h2 class="text-3xl sm:text-4xl font-bold mb-2">Enter The Number of <span class="text-cyan-400">Processes</span></h2>
+          <p class="text-[#6b6b80]">Configure your process parameters for scheduling analysis</p>
+        </div>
+
+        <!-- Number input (before table) -->
+        <div id="num-input-section" class="flex flex-col items-center gap-4 mb-8 fade-in-up" style="animation-delay:0.1s">
+          <div class="glass rounded-xl p-6 flex flex-col sm:flex-row items-center gap-4 w-full max-w-md">
+            <input type="number" id="num-processes" min="1" max="10" placeholder="e.g. 5"
+              class="text-center text-2xl font-bold h-14 w-full bg-transparent border border-white/10 rounded-lg px-3 focus:border-cyan-500/50 focus:outline-none text-white" />
+            <button onclick="generateTable()" id="btn-generate" class="h-14 px-8 bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-gray-900 font-semibold text-base w-full sm:w-auto rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+              Generate Table
+              <svg class="w-5 h-5 inline ml-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </button>
+          </div>
+          <p class="text-[#6b6b80]/60 text-sm">Supports 1 to 10 processes</p>
+        </div>
+
+        <!-- Process Table -->
+        <div id="table-section" class="hidden fade-in-up">
+          <div class="glass rounded-xl overflow-hidden">
+            <div class="p-4 pb-2">
+              <h3 class="flex items-center gap-3 text-lg font-semibold">
+                <div class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                  <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5"/></svg>
+                </div>
+                Process Table
+              </h3>
+            </div>
+            <div class="px-2 sm:px-4 pb-4">
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <thead>
+                    <tr class="border-b border-white/[0.06]">
+                      <th class="py-3 px-4 text-left text-sm font-semibold text-[#6b6b80] uppercase tracking-wider">Process</th>
+                      <th class="py-3 px-4 text-center text-sm font-semibold text-[#6b6b80] uppercase tracking-wider">Arrival Time</th>
+                      <th class="py-3 px-4 text-center text-sm font-semibold text-[#6b6b80] uppercase tracking-wider">Burst Time</th>
+                    </tr>
+                  </thead>
+                  <tbody id="process-table-body"></tbody>
+                </table>
+              </div>
+
+              <!-- Actions -->
+              <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-white/[0.06]">
+                <button onclick="resetInput()" class="flex items-center gap-2 text-[#6b6b80] hover:text-white transition-colors cursor-pointer">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
+                  Reset
+                </button>
+                <button onclick="analyzeWithAI()" id="btn-analyze" class="h-12 px-8 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold text-base rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+                  Analyze with AI
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SCREEN 3: ANALYZING ============ -->
+    <div id="screen-analyzing" class="hidden min-h-screen flex items-center justify-center px-4">
+      <div class="glass rounded-2xl p-10 max-w-md w-full text-center glow-border slide-in">
+        <!-- Spinning rings -->
+        <div class="relative w-20 h-20 mx-auto mb-6">
+          <div class="absolute inset-0 rounded-full border-2 border-cyan-500/20"></div>
+          <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-cyan-400 spin-slow"></div>
+          <div class="absolute inset-2 rounded-full border-2 border-transparent border-b-purple-400 spin-slow" style="animation-direction:reverse;animation-duration:2s"></div>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <svg class="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+          </div>
+        </div>
+
+        <h3 class="text-xl font-bold mb-2">Analyzing Process Data</h3>
+        <p class="text-[#6b6b80] mb-6">AI engine is evaluating optimal scheduling strategy</p>
+
+        <!-- Thinking dots -->
+        <div class="flex justify-center gap-2 mb-8">
+          <div class="think-dot w-2 h-2 rounded-full bg-cyan-400"></div>
+          <div class="think-dot w-2 h-2 rounded-full bg-cyan-400"></div>
+          <div class="think-dot w-2 h-2 rounded-full bg-cyan-400"></div>
+        </div>
+
+        <!-- Progress steps -->
+        <div class="space-y-3 text-left" id="analyze-steps">
+          <div class="flex items-center gap-3" id="step-0">
+            <div class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"><div class="w-2 h-2 rounded-full bg-[#6b6b80]/30"></div></div>
+            <span class="text-sm text-[#6b6b80]/40">Parsing process parameters</span>
+          </div>
+          <div class="flex items-center gap-3" id="step-1">
+            <div class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"><div class="w-2 h-2 rounded-full bg-[#6b6b80]/30"></div></div>
+            <span class="text-sm text-[#6b6b80]/40">Computing burst time distribution</span>
+          </div>
+          <div class="flex items-center gap-3" id="step-2">
+            <div class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"><div class="w-2 h-2 rounded-full bg-[#6b6b80]/30"></div></div>
+            <span class="text-sm text-[#6b6b80]/40">Evaluating arrival patterns</span>
+          </div>
+          <div class="flex items-center gap-3" id="step-3">
+            <div class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"><div class="w-2 h-2 rounded-full bg-[#6b6b80]/30"></div></div>
+            <span class="text-sm text-[#6b6b80]/40">Selecting optimal algorithm</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SCREEN 4: RESULT ============ -->
+    <div id="screen-result" class="hidden min-h-screen flex flex-col items-center justify-center px-4 py-8">
+      <div class="max-w-lg w-full">
+        <div class="glass rounded-2xl p-8 text-center glow-border scale-in">
+          <!-- Success icon -->
+          <div class="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mx-auto mb-6 fade-in-up">
+            <svg class="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+
+          <h3 class="text-lg text-[#6b6b80] mb-2">AI Analysis Complete</h3>
+
+          <!-- Algorithm badge -->
+          <div class="my-6 p-6 rounded-xl bg-gradient-to-br from-cyan-500/10 to-purple-500/10 border border-cyan-500/20 neon-pulse fade-in-up" style="animation-delay:0.2s">
+            <p class="text-sm text-[#6b6b80] mb-2">Best Algorithm</p>
+            <p id="result-algorithm" class="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent"></p>
+            <div class="mt-3 flex items-center justify-center gap-2">
+              <div class="h-1.5 flex-1 max-w-[120px] rounded-full bg-white/10 overflow-hidden">
+                <div id="result-bar" class="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 fill-bar" style="width:0"></div>
+              </div>
+              <span id="result-confidence" class="text-sm text-cyan-400 font-mono"></span>
+            </div>
+          </div>
+
+          <!-- Reasoning -->
+          <p id="result-reasoning" class="text-[#6b6b80] text-sm leading-relaxed mb-8 fade-in-up" style="animation-delay:0.3s"></p>
+
+          <!-- Actions -->
+          <div class="flex flex-col sm:flex-row gap-3 justify-center fade-in-up" style="animation-delay:0.4s">
+            <button onclick="showScreen('input')" class="h-12 px-8 text-[#6b6b80] hover:text-white font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+              Modify Input
+            </button>
+            <button onclick="proceedFromResult()" class="h-12 px-8 bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-gray-900 font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2">
+              Proceed
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SCREEN 5: CONDITIONAL INPUT ============ -->
+    <div id="screen-conditional" class="hidden min-h-screen flex flex-col items-center px-4 py-12">
+      <div class="w-full max-w-lg">
+        <button onclick="showScreen('result')" class="flex items-center gap-2 text-[#6b6b80] hover:text-white transition-colors mb-8 cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+          Back
+        </button>
+
+        <div class="text-center mb-8 fade-in-up">
+          <div id="cond-badge" class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-sm mb-4"></div>
+          <h2 id="cond-title" class="text-2xl sm:text-3xl font-bold mb-2"></h2>
+          <p id="cond-desc" class="text-[#6b6b80] text-sm"></p>
+        </div>
+
+        <div class="glass rounded-xl p-6 glow-border fade-in-up" style="animation-delay:0.1s">
+          <div id="cond-content"></div>
+
+          <div class="mt-6 pt-4 border-t border-white/[0.06]">
+            <button onclick="submitConditional()" id="btn-cond-submit" class="w-full h-12 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-white font-semibold rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+              Run Simulation
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SCREEN 6: GANTT + METRICS ============ -->
+    <div id="screen-gantt" class="hidden min-h-screen flex flex-col items-center px-4 py-12">
+      <div class="w-full max-w-4xl">
+        <!-- Header -->
+        <div class="text-center mb-8 fade-in-up">
+          <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm mb-4">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5"/></svg>
+            <span id="gantt-algo-name"></span>
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-bold mb-2">Live Gantt Chart <span class="text-cyan-400">Visualization</span></h2>
+          <p class="text-[#6b6b80] text-sm">Watch processes execute in real-time</p>
+        </div>
+
+        <!-- Gantt Chart Card -->
+        <div class="glass rounded-xl p-4 sm:p-6 glow-border mb-8 fade-in-up" style="animation-delay:0.1s">
+          <div class="overflow-x-auto pb-2">
+            <div class="min-w-[600px]">
+              <!-- Timeline -->
+              <div id="gantt-timeline" class="flex gap-0.5 mb-1"></div>
+              <!-- Blocks -->
+              <div id="gantt-blocks" class="flex gap-0.5 h-20 sm:h-24"></div>
+              <!-- Times -->
+              <div id="gantt-times" class="flex gap-0.5 mt-1"></div>
+            </div>
+          </div>
+          <!-- Completion -->
+          <div id="gantt-complete" class="hidden flex items-center justify-center gap-2 mt-4 pt-4 border-t border-white/[0.06] text-emerald-400 fade-in">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="font-semibold text-sm">Scheduling Complete</span>
+          </div>
+        </div>
+
+        <!-- Metrics -->
+        <div id="metrics-section" class="hidden">
+          <div class="text-center mb-6 fade-in-up">
+            <h3 class="text-xl font-bold">Performance <span class="text-cyan-400">Metrics</span></h3>
+            <p class="text-[#6b6b80] text-sm mt-1">Detailed scheduling performance analysis</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <!-- Avg Waiting Time -->
+            <div class="glass rounded-xl border border-cyan-500/20 shadow-lg shadow-cyan-500/10 fade-in-up" style="animation-delay:0s">
+              <div class="p-5 text-center">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center mx-auto mb-3">
+                  <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <p class="text-xs text-[#6b6b80] uppercase tracking-wider mb-1">Average Waiting Time</p>
+                <p id="metric-wt" class="text-3xl font-bold text-cyan-400 font-mono count-up"></p>
+                <p class="text-xs text-[#6b6b80]/60 mt-1">units</p>
+              </div>
+            </div>
+            <!-- Avg Turnaround Time -->
+            <div class="glass rounded-xl border border-purple-500/20 shadow-lg shadow-purple-500/10 fade-in-up" style="animation-delay:0.1s">
+              <div class="p-5 text-center">
+                <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
+                  <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <p class="text-xs text-[#6b6b80] uppercase tracking-wider mb-1">Average Turnaround Time</p>
+                <p id="metric-tat" class="text-3xl font-bold text-purple-400 font-mono count-up"></p>
+                <p class="text-xs text-[#6b6b80]/60 mt-1">units</p>
+              </div>
+            </div>
+            <!-- Avg Response Time -->
+            <div class="glass rounded-xl border border-emerald-500/20 shadow-lg shadow-emerald-500/10 fade-in-up" style="animation-delay:0.2s">
+              <div class="p-5 text-center">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center mx-auto mb-3">
+                  <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>
+                </div>
+                <p class="text-xs text-[#6b6b80] uppercase tracking-wider mb-1">Average Response Time</p>
+                <p id="metric-rt" class="text-3xl font-bold text-emerald-400 font-mono count-up"></p>
+                <p class="text-xs text-[#6b6b80]/60 mt-1">units</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Detailed Table -->
+          <div class="glass rounded-xl overflow-hidden border-white/[0.06] mb-8 fade-in-up" style="animation-delay:0.3s">
+            <div class="p-4 pb-2">
+              <h3 class="flex items-center gap-3 text-lg font-semibold">
+                <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                  <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+                </div>
+                Detailed Process Analysis
+              </h3>
+            </div>
+            <div class="px-2 sm:px-4 pb-4 overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-white/[0.06]">
+                    <th class="py-2 px-3 text-center text-xs font-semibold text-[#6b6b80] uppercase tracking-wider">Process</th>
+                    <th class="py-2 px-3 text-center text-xs font-semibold text-[#6b6b80] uppercase tracking-wider">AT</th>
+                    <th class="py-2 px-3 text-center text-xs font-semibold text-[#6b6b80] uppercase tracking-wider">BT</th>
+                    <th class="py-2 px-3 text-center text-xs font-semibold text-[#6b6b80] uppercase tracking-wider">CT</th>
+                    <th class="py-2 px-3 text-center text-xs font-semibold text-[#6b6b80] uppercase tracking-wider">TAT</th>
+                    <th class="py-2 px-3 text-center text-xs font-semibold text-[#6b6b80] uppercase tracking-wider">WT</th>
+                    <th class="py-2 px-3 text-center text-xs font-semibold text-[#6b6b80] uppercase tracking-wider">RT</th>
+                  </tr>
+                </thead>
+                <tbody id="detail-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Reset -->
+          <div class="flex justify-center pb-8 fade-in-up" style="animation-delay:0.4s">
+            <button onclick="fullReset()" class="h-12 px-8 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-500/20 hover:from-cyan-500/30 hover:to-purple-500/30 text-cyan-400 font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
+              Start New Simulation
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+// =====================================================
+// STATE
+// =====================================================
+let state = {
+  numProcesses: 0,
+  processes: [],
+  mlDecision: null,
+  timeQuantum: null,
+  priorities: {},
+  scheduleResult: null,
+  ganttTimer: null,
+};
+
+const COLORS = {
+  P1: { bg: 'rgba(6,182,212,0.2)', border: 'rgba(6,182,212,0.6)', text: '#22d3ee', name: 'cyan' },
+  P2: { bg: 'rgba(168,85,247,0.2)', border: 'rgba(168,85,247,0.6)', text: '#c084fc', name: 'purple' },
+  P3: { bg: 'rgba(244,63,94,0.2)', border: 'rgba(244,63,94,0.6)', text: '#fb7185', name: 'rose' },
+  P4: { bg: 'rgba(16,185,129,0.2)', border: 'rgba(16,185,129,0.6)', text: '#34d399', name: 'emerald' },
+  P5: { bg: 'rgba(245,158,11,0.2)', border: 'rgba(245,158,11,0.6)', text: '#fbbf24', name: 'amber' },
+  P6: { bg: 'rgba(236,72,153,0.2)', border: 'rgba(236,72,153,0.6)', text: '#f472b6', name: 'pink' },
+  P7: { bg: 'rgba(20,184,166,0.2)', border: 'rgba(20,184,166,0.6)', text: '#2dd4bf', name: 'teal' },
+  P8: { bg: 'rgba(139,92,246,0.2)', border: 'rgba(139,92,246,0.6)', text: '#a78bfa', name: 'violet' },
+  P9: { bg: 'rgba(249,115,22,0.2)', border: 'rgba(249,115,22,0.6)', text: '#fb923c', name: 'orange' },
+  P10: { bg: 'rgba(132,204,22,0.2)', border: 'rgba(132,204,22,0.6)', text: '#a3e635', name: 'lime' },
+};
+const EXTRA = [
+  { bg: 'rgba(14,165,233,0.2)', border: 'rgba(14,165,233,0.6)', text: '#38bdf8', name: 'sky' },
+  { bg: 'rgba(192,38,211,0.2)', border: 'rgba(192,38,211,0.6)', text: '#e879f9', name: 'fuchsia' },
+];
+
+function getColor(id) {
+  return COLORS[id] || EXTRA[0];
+}
+
+// =====================================================
+// SCREEN MANAGEMENT
+// =====================================================
+function showScreen(name) {
+  document.querySelectorAll('[id^="screen-"]').forEach(el => el.classList.add('hidden'));
+  const el = document.getElementById('screen-' + name);
+  if (el) {
+    el.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+// =====================================================
+// GENERATE TABLE
+// =====================================================
+function generateTable() {
+  const n = parseInt(document.getElementById('num-processes').value);
+  if (!n || n < 1 || n > 10) return;
+
+  state.numProcesses = n;
+  state.processes = Array.from({ length: n }, (_, i) => ({
+    id: 'P' + (i + 1), arrivalTime: 0, burstTime: 0
+  }));
+
+  document.getElementById('num-input-section').classList.add('hidden');
+  document.getElementById('table-section').classList.remove('hidden');
+
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.getElementById('process-table-body');
+  tbody.innerHTML = state.processes.map((p, i) => {
+    const c = getColor(p.id);
+    return `<tr class="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors fade-in-up" style="animation-delay:${i * 0.05}s">
+      <td class="py-3 px-4">
+        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-lg" style="background:${c.bg};border:1px solid ${c.border}">
+          <span class="w-2 h-2 rounded-full" style="background:${c.text}"></span>
+          <span class="font-mono font-semibold" style="color:${c.text}">${p.id}</span>
+        </span>
+      </td>
+      <td class="py-3 px-4">
+        <div class="flex justify-center">
+          <input type="number" min="0" value="${p.arrivalTime}" onchange="updateProcess(${i},'arrival',this.value)"
+            class="w-24 text-center h-10 bg-transparent border border-white/10 rounded-lg focus:border-cyan-500/50 focus:outline-none text-white" />
+        </div>
+      </td>
+      <td class="py-3 px-4">
+        <div class="flex justify-center">
+          <input type="number" min="1" value="${p.burstTime}" onchange="updateProcess(${i},'burst',this.value)"
+            class="w-24 text-center h-10 bg-transparent border border-white/10 rounded-lg focus:border-cyan-500/50 focus:outline-none text-white" />
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function updateProcess(idx, field, val) {
+  state.processes[idx][field === 'arrival' ? 'arrivalTime' : 'burstTime'] = Math.max(0, parseInt(val) || 0);
+  checkAnalyzeBtn();
+}
+
+function checkAnalyzeBtn() {
+  const valid = state.processes.filter(p => p.burstTime > 0).length > 0;
+  document.getElementById('btn-analyze').disabled = !valid;
+}
+
+function resetInput() {
+  state.processes = [];
+  state.numProcesses = 0;
+  document.getElementById('table-section').classList.add('hidden');
+  document.getElementById('num-input-section').classList.remove('hidden');
+  document.getElementById('num-processes').value = '';
+}
+
+// =====================================================
+// ML ANALYSIS
+// =====================================================
+function analyzeWithAI() {
+  const valid = state.processes.filter(p => p.burstTime > 0);
+  if (valid.length === 0) return;
+
+  showScreen('analyzing');
+  animateSteps();
+
+  // Simulate delay
+  const delay = 2500 + Math.random() * 1500;
+  setTimeout(() => {
+    state.mlDecision = analyzeAndRecommend(valid);
+    showResult();
+  }, delay);
+}
+
+function animateSteps() {
+  for (let i = 0; i < 4; i++) {
+    setTimeout(() => {
+      const step = document.getElementById('step-' + i);
+      if (step) {
+        step.querySelector('div').innerHTML = `<svg class="w-4 h-4 text-cyan-400 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>`;
+        step.querySelector('span').className = 'text-sm text-white';
+      }
+    }, 500 + i * 600);
+  }
+
+  // Reset steps for next use
+  setTimeout(() => {
+    for (let i = 0; i < 4; i++) {
+      const step = document.getElementById('step-' + i);
+      if (step) {
+        step.querySelector('div').innerHTML = '<div class="w-2 h-2 rounded-full bg-[#6b6b80]/30"></div>';
+        step.querySelector('span').className = 'text-sm text-[#6b6b80]/40';
+      }
+    }
+  }, 5000);
+}
+
+function showResult() {
+  const d = state.mlDecision;
+  document.getElementById('result-algorithm').textContent = d.algorithm;
+  document.getElementById('result-confidence').textContent = (d.confidence * 100).toFixed(0) + '%';
+  document.getElementById('result-reasoning').textContent = d.reasoning;
+
+  showScreen('result');
+
+  // Animate confidence bar
+  setTimeout(() => {
+    document.getElementById('result-bar').style.width = (d.confidence * 100) + '%';
+  }, 300);
+}
+
+function proceedFromResult() {
+  if (!state.mlDecision) return;
+  const algo = state.mlDecision.algorithm;
+
+  if (algo === 'Round Robin') {
+    showConditionalScreen('Round Robin');
+  } else if (algo === 'Priority Scheduling') {
+    showConditionalScreen('Priority Scheduling');
+  } else {
+    runScheduling(algo);
+  }
+}
+
+// =====================================================
+// CONDITIONAL INPUT
+// =====================================================
+function showConditionalScreen(type) {
+  const badge = document.getElementById('cond-badge');
+  const title = document.getElementById('cond-title');
+  const desc = document.getElementById('cond-desc');
+  const content = document.getElementById('cond-content');
+
+  if (type === 'Round Robin') {
+    badge.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Round Robin Configuration`;
+    title.textContent = 'Enter Time Quantum';
+    desc.textContent = 'Define the time slice for each process execution cycle';
+    content.innerHTML = `
+      <div class="flex flex-col items-center gap-4">
+        <input type="number" id="input-quantum" min="1" placeholder="e.g. 2"
+          class="text-center text-4xl font-bold h-20 w-48 bg-transparent border border-white/10 rounded-xl focus:border-cyan-500/50 focus:outline-none text-white" />
+        <p class="text-[#6b6b80]/60 text-sm">Recommended: 1-4 for best visualization</p>
+      </div>`;
+  } else {
+    badge.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3"/></svg> Priority Scheduling Configuration`;
+    title.textContent = 'Enter Process Priorities';
+    desc.textContent = 'Lower number = higher priority';
+    const valid = state.processes.filter(p => p.burstTime > 0);
+    content.innerHTML = `<div class="space-y-3">${valid.map((p, i) => {
+      const c = getColor(p.id);
+      return `<div class="flex items-center justify-between gap-4 py-2 px-3 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors fade-in-up" style="animation-delay:${i * 0.05}s">
+        <span class="font-mono font-semibold flex items-center gap-2" style="color:${c.text}">
+          <span class="w-3 h-3 rounded" style="background:${c.bg};border:1px solid ${c.border}"></span>
+          ${p.id}
+        </span>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-[#6b6b80]">Priority:</span>
+          <input type="number" id="priority-${p.id}" min="1" max="20" placeholder="1"
+            class="w-20 text-center h-9 bg-transparent border border-white/10 rounded-lg focus:border-purple-500/50 focus:outline-none text-white" />
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  showScreen('conditional');
+}
+
+function submitConditional() {
+  const algo = state.mlDecision.algorithm;
+  if (algo === 'Round Robin') {
+    const q = parseInt(document.getElementById('input-quantum').value);
+    if (!q || q < 1) return;
+    state.timeQuantum = q;
+    runScheduling('Round Robin');
+  } else {
+    const valid = state.processes.filter(p => p.burstTime > 0);
+    const prios = {};
+    let allValid = true;
+    valid.forEach(p => {
+      const val = parseInt(document.getElementById('priority-' + p.id).value);
+      if (!val || val < 1) { allValid = false; return; }
+      prios[p.id] = val;
+    });
+    if (!allValid) return;
+    state.priorities = prios;
+    runScheduling('Priority Scheduling');
+  }
+}
+
+// =====================================================
+// SCHEDULING ALGORITHMS
+// =====================================================
+function runScheduling(algorithm) {
+  const valid = state.processes.filter(p => p.burstTime > 0);
+  let result;
+
+  switch (algorithm) {
+    case 'Round Robin':
+      result = roundRobin(valid, state.timeQuantum);
+      break;
+    case 'Priority Scheduling':
+      result = prioritySched(valid.map(p => ({ ...p, priority: state.priorities[p.id] || 1 })));
+      break;
+    case 'SJF':
+      result = sjf(valid);
+      break;
+    case 'SRTF':
+      result = srtf(valid);
+      break;
+    default:
+      result = fcfs(valid);
+  }
+
+  state.scheduleResult = result;
+  showScreen('gantt');
+  document.getElementById('gantt-algo-name').textContent = algorithm;
+  animateGantt(result.gantt, result);
+}
+
+function fcfs(processes) {
+  const sorted = [...processes].sort((a, b) => a.arrivalTime - b.arrivalTime);
+  const gantt = [], results = [];
+  let t = 0;
+  for (const p of sorted) {
+    if (t < p.arrivalTime) { gantt.push({ pid: 'IDLE', s: t, e: p.arrivalTime, idle: true }); t = p.arrivalTime; }
+    gantt.push({ pid: p.id, s: t, e: t + p.burstTime });
+    const rt = t - p.arrivalTime; t += p.burstTime;
+    results.push({ id: p.id, at: p.arrivalTime, bt: p.burstTime, ct: t, tat: t - p.arrivalTime, wt: t - p.arrivalTime - p.burstTime, rt });
+  }
+  return { gantt, results, awt: avg(results, 'wt'), atat: avg(results, 'tat'), art: avg(results, 'rt') };
+}
+
+function sjf(processes) {
+  const rem = processes.map(p => ({ ...p }));
+  const gantt = [], done = [];
+  let t = 0;
+  while (rem.length) {
+    const avail = rem.filter(p => p.arrivalTime <= t);
+    if (!avail.length) { const na = Math.min(...rem.map(p => p.arrivalTime)); gantt.push({ pid: 'IDLE', s: t, e: na, idle: true }); t = na; continue; }
+    avail.sort((a, b) => a.burstTime - b.burstTime || a.arrivalTime - b.arrivalTime);
+    const p = avail[0]; rem.splice(rem.indexOf(p), 1);
+    gantt.push({ pid: p.id, s: t, e: t + p.burstTime });
+    const rt = t - p.arrivalTime; t += p.burstTime;
+    done.push({ id: p.id, at: p.arrivalTime, bt: p.burstTime, ct: t, tat: t - p.arrivalTime, wt: t - p.arrivalTime - p.burstTime, rt });
+  }
+  return { gantt, results: done, awt: avg(done, 'wt'), atat: avg(done, 'tat'), art: avg(done, 'rt') };
+}
+
+function srtf(processes) {
+  const rem = processes.map(p => ({ ...p, rem: p.burstTime, fr: -1 }));
+  const gantt = [], done = [];
+  let t = 0, last = null;
+  while (rem.some(p => p.rem > 0)) {
+    const avail = rem.filter(p => p.arrivalTime <= t && p.rem > 0);
+    if (!avail.length) { const na = Math.min(...rem.filter(p => p.rem > 0).map(p => p.arrivalTime)); if (last !== 'IDLE') { if (last && gantt.length) gantt[gantt.length - 1].e = t; last = 'IDLE'; } gantt.push({ pid: 'IDLE', s: t, e: na, idle: true }); t = na; last = 'IDLE'; continue; }
+    avail.sort((a, b) => a.rem - b.rem || a.arrivalTime - b.arrivalTime);
+    const p = avail[0];
+    if (p.fr === -1) p.fr = t;
+    if (last !== p.id) { if (last && gantt.length) gantt[gantt.length - 1].e = t; gantt.push({ pid: p.id, s: t, e: t + 1 }); last = p.id; } else gantt[gantt.length - 1].e = t + 1;
+    p.rem--; t++;
+    if (p.rem === 0) done.push({ id: p.id, at: p.arrivalTime, bt: p.burstTime, ct: t, tat: t - p.arrivalTime, wt: t - p.arrivalTime - p.burstTime, rt: p.fr - p.arrivalTime });
+  }
+  return { gantt, results: done, awt: avg(done, 'wt'), atat: avg(done, 'tat'), art: avg(done, 'rt') };
+}
+
+function roundRobin(processes, quantum) {
+  const queue = [], rem = processes.map(p => ({ ...p, rem: p.burstTime, fr: -1 }));
+  const sorted = [...processes].sort((a, b) => a.arrivalTime - b.arrivalTime);
+  const gantt = [], done = [];
+  let t = 0, idx = 0, last = null;
+  while (idx < sorted.length && sorted[idx].arrivalTime <= t) { queue.push(rem.find(p => p.id === sorted[idx].id)); idx++; }
+  while (queue.length || idx < sorted.length) {
+    if (!queue.length) { const na = sorted[idx].arrivalTime; if (last !== 'IDLE') { if (last && gantt.length) gantt[gantt.length - 1].e = t; last = 'IDLE'; } gantt.push({ pid: 'IDLE', s: t, e: na, idle: true }); t = na; while (idx < sorted.length && sorted[idx].arrivalTime <= t) { queue.push(rem.find(p => p.id === sorted[idx].id)); idx++; } continue; }
+    const p = queue.shift();
+    if (p.fr === -1) p.fr = t;
+    const ex = Math.min(quantum, p.rem);
+    if (last !== p.id) { if (last && gantt.length) gantt[gantt.length - 1].e = t; gantt.push({ pid: p.id, s: t, e: t + ex }); last = p.id; } else gantt[gantt.length - 1].e = t + ex;
+    p.rem -= ex; t += ex;
+    while (idx < sorted.length && sorted[idx].arrivalTime <= t) { queue.push(rem.find(pp => pp.id === sorted[idx].id)); idx++; }
+    if (p.rem > 0) queue.push(p); else done.push({ id: p.id, at: p.arrivalTime, bt: p.burstTime, ct: t, tat: t - p.arrivalTime, wt: t - p.arrivalTime - p.burstTime, rt: p.fr - p.arrivalTime });
+  }
+  return { gantt, results: done, awt: avg(done, 'wt'), atat: avg(done, 'tat'), art: avg(done, 'rt') };
+}
+
+function prioritySched(processes) {
+  const rem = processes.map(p => ({ ...p }));
+  const gantt = [], done = [];
+  let t = 0;
+  while (rem.length) {
+    const avail = rem.filter(p => p.arrivalTime <= t);
+    if (!avail.length) { const na = Math.min(...rem.map(p => p.arrivalTime)); gantt.push({ pid: 'IDLE', s: t, e: na, idle: true }); t = na; continue; }
+    avail.sort((a, b) => (a.priority || 0) - (b.priority || 0) || a.arrivalTime - b.arrivalTime);
+    const p = avail[0]; rem.splice(rem.indexOf(p), 1);
+    gantt.push({ pid: p.id, s: t, e: t + p.burstTime });
+    const rt = t - p.arrivalTime; t += p.burstTime;
+    done.push({ id: p.id, at: p.arrivalTime, bt: p.burstTime, ct: t, tat: t - p.arrivalTime, wt: t - p.arrivalTime - p.burstTime, rt });
+  }
+  return { gantt, results: done, awt: avg(done, 'wt'), atat: avg(done, 'tat'), art: avg(done, 'rt') };
+}
+
+function avg(arr, key) { return parseFloat((arr.reduce((s, p) => s + p[key], 0) / (arr.length || 1)).toFixed(2)); }
+
+// =====================================================
+// ML DECISION ENGINE
+// =====================================================
+function analyzeAndRecommend(processes) {
+  if (!processes.length) return { algorithm: 'FCFS', confidence: 0.5, reasoning: 'Default selection.' };
+  const bts = processes.map(p => p.burstTime), ats = processes.map(p => p.arrivalTime);
+  const avg = bts.reduce((a, b) => a + b, 0) / bts.length;
+  const vari = bts.reduce((s, bt) => s + Math.pow(bt - avg, 2), 0) / bts.length;
+  const cv = Math.sqrt(vari) / avg;
+  const n = processes.length, maxA = Math.max(...ats);
+  const allZero = maxA === 0, staggered = !allZero && ats.some((a, i) => i > 0 && a > ats[i - 1]);
+
+  if (n >= 6 && cv > 0.5) return { algorithm: 'Priority Scheduling', confidence: 0.89, reasoning: `Detected ${n} processes with high burst time variability (CV=${cv.toFixed(2)}). Priority scheduling allows explicit control over execution order.` };
+  if (n >= 5 && cv <= 0.3) return { algorithm: 'Round Robin', confidence: 0.91, reasoning: `Detected ${n} processes with similar burst times (CV=${cv.toFixed(2)}). Round Robin ensures fair time-sharing.` };
+  if (staggered && cv > 0.4) return { algorithm: 'SRTF', confidence: 0.87, reasoning: `Staggered arrivals with varying burst times. SRTF minimizes average waiting time by preempting longer processes.` };
+  if (allZero && cv > 0.35) return { algorithm: 'SJF', confidence: 0.85, reasoning: `All processes arrive simultaneously with varying burst times (CV=${cv.toFixed(2)}). SJF minimizes average waiting time.` };
+  if (cv > 0.4) return { algorithm: 'SJF', confidence: 0.82, reasoning: `Significant burst time variation (CV=${cv.toFixed(2)}). SJF prioritizes shorter processes.` };
+  if (n <= 3) return { algorithm: 'FCFS', confidence: 0.78, reasoning: `With only ${n} process${n > 1 ? 'es' : ''}, FCFS provides simple and predictable scheduling.` };
+  return { algorithm: 'Round Robin', confidence: 0.80, reasoning: `Balanced workload across ${n} processes. Round Robin provides fair CPU allocation.` };
+}
+
+// =====================================================
+// GANTT ANIMATION
+// =====================================================
+function animateGantt(gantt, result) {
+  const blocksEl = document.getElementById('gantt-blocks');
+  const timelineEl = document.getElementById('gantt-timeline');
+  const timesEl = document.getElementById('gantt-times');
+  const completeEl = document.getElementById('gantt-complete');
+  const metricsEl = document.getElementById('metrics-section');
+
+  blocksEl.innerHTML = '';
+  timelineEl.innerHTML = '';
+  timesEl.innerHTML = '';
+  completeEl.classList.add('hidden');
+  metricsEl.classList.add('hidden');
+
+  let count = 0;
+  if (state.ganttTimer) clearInterval(state.ganttTimer);
+
+  state.ganttTimer = setInterval(() => {
+    if (count >= gantt.length) {
+      clearInterval(state.ganttTimer);
+      state.ganttTimer = null;
+      completeEl.classList.remove('hidden');
+      setTimeout(() => showMetrics(result), 500);
+      return;
+    }
+
+    const block = gantt[count];
+    const dur = block.e - block.s;
+    const w = Math.max(dur * 50, 50);
+    const c = block.idle ? null : getColor(block.pid);
+    const color = c || { bg: 'rgba(255,255,255,0.02)', border: 'rgba(255,255,255,0.06)', text: 'rgba(255,255,255,0.2)' };
+
+    // Timeline
+    const tlDiv = document.createElement('div');
+    tlDiv.className = 'flex-1 flex justify-between fade-in';
+    tlDiv.style.minWidth = w + 'px';
+    tlDiv.style.animationDuration = '0.3s';
+    tlDiv.innerHTML = `<span class="text-[10px] text-[#6b6b80]/50 font-mono">${block.s}</span>`;
+    timelineEl.appendChild(tlDiv);
+
+    // Block
+    const bDiv = document.createElement('div');
+    bDiv.className = `h-full flex items-center justify-center rounded-lg border relative overflow-hidden flex-shrink-0 gantt-block ${block.idle ? '' : 'block-shimmer'}`;
+    bDiv.style.cssText = `min-width:${w}px;background:${color.bg};border:1px solid ${color.border};${block.idle ? 'border-style:dashed;' : ''}`;
+    bDiv.innerHTML = `<span class="relative font-mono font-bold text-sm" style="color:${color.text}">${block.idle ? 'IDLE' : block.pid}</span>`;
+    blocksEl.appendChild(bDiv);
+
+    // Time
+    const tDiv = document.createElement('div');
+    tDiv.className = 'flex-1 flex flex-col items-center fade-in';
+    tDiv.style.minWidth = w + 'px';
+    tDiv.style.animationDuration = '0.3s';
+    tDiv.innerHTML = `<span class="text-[10px] text-[#6b6b80]/60 font-mono">${block.s}</span>`;
+    timesEl.appendChild(tDiv);
+
+    count++;
+  }, 600);
+}
+
+// =====================================================
+// METRICS
+// =====================================================
+function showMetrics(result) {
+  document.getElementById('metrics-section').classList.remove('hidden');
+  document.getElementById('metric-wt').textContent = result.awt.toFixed(2);
+  document.getElementById('metric-tat').textContent = result.atat.toFixed(2);
+  document.getElementById('metric-rt').textContent = result.art.toFixed(2);
+
+  const tbody = document.getElementById('detail-table-body');
+  tbody.innerHTML = result.results.map((p, i) => {
+    const c = getColor(p.id);
+    return `<tr class="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors fade-in-up" style="animation-delay:${i * 0.05}s">
+      <td class="py-2 px-3 text-center"><span class="font-mono font-semibold" style="color:${c.text}">${p.id}</span></td>
+      <td class="py-2 px-3 text-center text-[#6b6b80]">${p.at}</td>
+      <td class="py-2 px-3 text-center text-[#6b6b80]">${p.bt}</td>
+      <td class="py-2 px-3 text-center text-white font-medium">${p.ct}</td>
+      <td class="py-2 px-3 text-center text-cyan-400 font-medium">${p.tat}</td>
+      <td class="py-2 px-3 text-center text-purple-400 font-medium">${p.wt}</td>
+      <td class="py-2 px-3 text-center text-emerald-400 font-medium">${p.rt}</td>
+    </tr>`;
+  }).join('');
+}
+
+// =====================================================
+// FULL RESET
+// =====================================================
+function fullReset() {
+  if (state.ganttTimer) { clearInterval(state.ganttTimer); state.ganttTimer = null; }
+  state = { numProcesses: 0, processes: [], mlDecision: null, timeQuantum: null, priorities: {}, scheduleResult: null, ganttTimer: null };
+  resetInput();
+  showScreen('landing');
+}
+</script>
+
+</body>
+</html>
